@@ -48,9 +48,23 @@ export default function QuotationGenerator() {
     refetchInterval: 5000,
   });
 
-  const validQuotations = quotations.filter(q => 
-    orders.some(o => o.id === q.order_id)
-  );
+  // Filter and deduplicate quotations - only show the most recent per order
+  const validQuotations = React.useMemo(() => {
+    const quotationsWithOrders = quotations.filter(q => 
+      orders.some(o => o.id === q.order_id)
+    );
+    
+    // Group by order_id and keep only the most recent
+    const quotationsByOrder = {};
+    quotationsWithOrders.forEach(q => {
+      if (!quotationsByOrder[q.order_id] || 
+          new Date(q.created_date) > new Date(quotationsByOrder[q.order_id].created_date)) {
+        quotationsByOrder[q.order_id] = q;
+      }
+    });
+    
+    return Object.values(quotationsByOrder);
+  }, [quotations, orders]);
 
   useEffect(() => {
     if (orderId && validQuotations.length > 0) {
@@ -122,7 +136,6 @@ export default function QuotationGenerator() {
     
     setIsGeneratingPDF(true);
     
-    // Add print styles temporarily
     const style = document.createElement('style');
     style.innerHTML = `
       @media print {
@@ -146,7 +159,6 @@ export default function QuotationGenerator() {
     `;
     document.head.appendChild(style);
     
-    // Trigger print
     setTimeout(() => {
       window.print();
       document.head.removeChild(style);
